@@ -2,7 +2,9 @@ import os
 import re
 import argparse
 import json
+import pandas as pd
 from collections import defaultdict
+import xlsxwriter
 
 TAGS = ["TODO", "FIXME", "HACK", "NOTE", "BUG", "OPTIMIZE", "REVIEW"]
 TAG_PATTERN = re.compile(r'#?\s*({}):?(.*)'.format('|'.join(TAGS)))  # supports Python/C/JS
@@ -34,6 +36,18 @@ def collect_tags(base_path, exts, tag_filter):
             print(f"Warning: Could not read {filepath}: {e}")
     return results
 
+def output_excel(results, path):
+    grouped = defaultdict(list)
+    for item in results:
+        grouped[item['tag']].append(item)
+
+    with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
+        for tag, items in grouped.items():
+            df = pd.DataFrame(items)
+            df = df[['file', 'line', 'comment']]
+            df.columns = ['File', 'Line', 'Comment']
+            df.to_excel(writer, sheet_name=tag[:31], index=False)
+
 def format_output(results, fmt='text', group=False):
     if group:
         grouped = defaultdict(list)
@@ -54,6 +68,10 @@ def format_output(results, fmt='text', group=False):
             output.append("")
         return "\n".join(output)
 
+    elif fmt == 'excel':
+        output_excel(results, 'output.xlsx')
+        return ""  # no stdout print
+
     else:  # plain text
         output = []
         for tag, items in grouped.items():
@@ -68,7 +86,7 @@ def main():
     parser.add_argument('directory', help='Project directory to scan')
     parser.add_argument('--tag', nargs='*', help='Filter by specific tags (e.g. TODO FIXME)')
     parser.add_argument('--ext', nargs='*', help='File extensions to include (e.g. .py .js)')
-    parser.add_argument('--format', choices=['text', 'json', 'markdown'], default='text', help='Output format')
+    parser.add_argument('--format', choices=['text', 'json', 'markdown', 'excel'], default='text', help='Output format')
     parser.add_argument('--group', action='store_true', help='Group output by tag type')
     parser.add_argument('--out', help='Write output to file instead of stdout')
 
