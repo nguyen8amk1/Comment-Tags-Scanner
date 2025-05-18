@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
+import 'package:flutter/animation.dart';
+import 'dart:ui';
 
 void main() async {
   // Example 1: File Explorer Data
@@ -31,46 +33,49 @@ void main() async {
     ''';
 
   final initialTabs = [
-    DataViewerTab(
+    DataViewerTab.autoConfigure(
       tabName: "Files",
-      columns: [
-        DataColumnInfo("Name", "path", flex: 3),
-        DataColumnInfo("Modified", "dateModified", flex: 2),
-        DataColumnInfo("Size", "size", flex: 1),
-      ],
       data: jsonDecode(jsonData1),
-      formatters: {
-        "size": (value) => _formatFileSize(value),
-        "dateModified": (value) => _formatDate(DateTime.parse(value)),
+      // Optional overrides
+      columnOverrides: {
+        "size": ColumnConfig(
+          header: "Size (bytes)",
+          cellAlignment: Alignment.centerRight,
+          formatter: FileSizeFormatter()),
       },
     ),
-    DataViewerTab(
+    DataViewerTab.autoConfigure(
       tabName: "Products",
-      columns: [
-        DataColumnInfo("ID", "id", flex: 1),
-        DataColumnInfo("Product", "name", flex: 2),
-        DataColumnInfo("Category", "category", flex: 2),
-        DataColumnInfo("Price", "price", flex: 1),
-        DataColumnInfo("Stock", "stock", flex: 1),
-      ],
       data: jsonDecode(jsonData2),
-      formatters: {
-        "price": (value) => '\$${value.toStringAsFixed(2)}',
+      // Optional overrides
+      columnOverrides: {
+        "price": ColumnConfig(
+          header: "Price (USD)",
+          formatter: CurrencyFormatter(),
+          cellStyle: (value) => TextStyle(
+            color: value > 500 ? Colors.green : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        "stock": ColumnConfig(
+          cellStyle: (value) => TextStyle(
+            color: value < 20 ? Colors.red : Colors.black,
+          ),
+        ),
       },
     ),
-    DataViewerTab(
+    DataViewerTab.autoConfigure(
       tabName: "Employees",
-      columns: [
-        DataColumnInfo("ID", "employeeId", flex: 1),
-        DataColumnInfo("Name", "fullName", flex: 2),
-        DataColumnInfo("Department", "department", flex: 2),
-        DataColumnInfo("Hire Date", "hireDate", flex: 1),
-        DataColumnInfo("Salary", "salary", flex: 1),
-      ],
       data: jsonDecode(jsonData3),
-      formatters: {
-        "salary": (value) => '\$${value.toStringAsFixed(0)}',
-        "hireDate": (value) => _formatDate(DateTime.parse(value)),
+      // Optional overrides
+      columnOverrides: {
+        "salary": ColumnConfig(
+          formatter: CurrencyFormatter(showCents: false),
+          cellAlignment: Alignment.centerRight,
+        ),
+        "hireDate": ColumnConfig(
+          formatter: DateFormatter(),
+        ),
       },
     ),
   ];
@@ -83,60 +88,212 @@ void main() async {
   );
 }
 
-String _formatFileSize(dynamic size) {
-  if (size is! int) return size.toString();
-  
-  if (size < 1024) {
-    return '$size bytes';
-  } else if (size < 1024 * 1024) {
-    double kb = size / 1024;
-    return '${kb.toStringAsFixed(2)} KB';
-  } else {
-    double mb = size / (1024 * 1024);
-    return '${mb.toStringAsFixed(2)} MB';
-  }
-}
-
-String _formatDate(DateTime date) {
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Data Viewer',
+      title: 'Smart Data Viewer',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        extensions: const [
+          DataViewerTheme(
+            headerStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            headerBackground: Colors.blue,
+            rowHeight: 48.0,
+            evenRowColor: Colors.white,
+            oddRowColor: Color(0xFFF5F5F5),
+            sortIcon: Icons.sort,
+            sortAscendingIcon: Icons.arrow_upward,
+            sortDescendingIcon: Icons.arrow_downward,
+          ),
+        ],
       ),
       home: const MultiDataViewer(),
     );
   }
 }
 
-class DataColumnInfo {
-  final String displayName;
-  final String dataKey;
+/// --------------------------
+/// Data Model and Configuration
+/// --------------------------
+
+class ColumnConfig {
+  final String? header;
   final int flex;
   final bool sortable;
+  final CellContentFormatter? formatter;
+  final TextStyle? Function(dynamic)? cellStyle;
+  final Alignment? cellAlignment;
 
-  DataColumnInfo(this.displayName, this.dataKey, {this.flex = 1, this.sortable = true});
+  ColumnConfig({
+    this.header,
+    this.flex = 1,
+    this.sortable = true,
+    this.formatter,
+    this.cellStyle,
+    this.cellAlignment,
+  });
 }
 
 class DataViewerTab {
   final String tabName;
-  final List<DataColumnInfo> columns;
   final List<dynamic> data;
-  final Map<String, String Function(dynamic)> formatters;
+  final Map<String, ColumnConfig> columnConfigs;
 
   DataViewerTab({
     required this.tabName,
-    required this.columns,
     required this.data,
-    this.formatters = const {},
+    required this.columnConfigs,
   });
+
+  factory DataViewerTab.autoConfigure({
+    required String tabName,
+    required List<dynamic> data,
+    Map<String, ColumnConfig> columnOverrides = const {},
+  }) {
+    if (data.isEmpty) {
+      return DataViewerTab(
+        tabName: tabName,
+        data: data,
+        columnConfigs: columnOverrides,
+      );
+    }
+
+    // Auto-detect columns from first data item
+    final firstItem = data.first as Map<String, dynamic>;
+    final columnConfigs = <String, ColumnConfig>{};
+
+    for (final key in firstItem.keys) {
+      final value = firstItem[key];
+      ColumnConfig config;
+
+      if (columnOverrides.containsKey(key)) {
+        config = columnOverrides[key]!;
+      } else {
+        // Auto-configure based on value type and key name
+        config = _autoConfigureColumn(key, value);
+      }
+
+      columnConfigs[key] = config;
+    }
+
+    return DataViewerTab(
+      tabName: tabName,
+      data: data,
+      columnConfigs: columnConfigs,
+    );
+  }
+
+  static ColumnConfig _autoConfigureColumn(String key, dynamic value) {
+    // Detect common patterns from key names
+    final lowerKey = key.toLowerCase();
+
+    // File size detection
+    if (lowerKey.contains('size') && value is num) {
+      return ColumnConfig(
+        header: key,
+        formatter: FileSizeFormatter(),
+        cellAlignment: Alignment.centerRight,
+      );
+    }
+
+    // Currency detection
+    if (lowerKey.contains('price') || lowerKey.contains('salary') || lowerKey.contains('amount')) {
+      return ColumnConfig(
+        header: key,
+        formatter: CurrencyFormatter(),
+        cellAlignment: Alignment.centerRight,
+      );
+    }
+
+    // Date detection
+    if (lowerKey.contains('date') || lowerKey.contains('modified') || lowerKey.contains('time')) {
+      return ColumnConfig(
+        header: key,
+        formatter: DateFormatter(),
+      );
+    }
+
+    // Numeric values
+    if (value is num) {
+      return ColumnConfig(
+        header: key,
+        cellAlignment: Alignment.centerRight,
+      );
+    }
+
+    // Default configuration
+    return ColumnConfig(header: key);
+  }
+
+  List<String> get columnKeys => columnConfigs.keys.toList();
+}
+
+abstract class CellContentFormatter {
+  String format(dynamic value);
+  TextAlign get textAlign => TextAlign.left;
+}
+
+class FileSizeFormatter extends CellContentFormatter {
+  @override
+  String format(dynamic size) {
+    if (size is! num) return size.toString();
+    
+    if (size < 1024) {
+      return '$size bytes';
+    } else if (size < 1024 * 1024) {
+      double kb = size / 1024;
+      return '${kb.toStringAsFixed(2)} KB';
+    } else {
+      double mb = size / (1024 * 1024);
+      return '${mb.toStringAsFixed(2)} MB';
+    }
+  }
+
+  @override
+  TextAlign get textAlign => TextAlign.right;
+}
+
+class CurrencyFormatter extends CellContentFormatter {
+  final bool showCents;
+  final String symbol;
+
+  CurrencyFormatter({this.showCents = true, this.symbol = '\$'});
+
+  @override
+  String format(dynamic value) {
+    if (value is num) {
+      return showCents 
+          ? '$symbol${value.toStringAsFixed(2)}'
+          : '$symbol${value.toStringAsFixed(0)}';
+    }
+    return value.toString();
+  }
+
+  @override
+  TextAlign get textAlign => TextAlign.right;
+}
+
+class DateFormatter extends CellContentFormatter {
+  @override
+  String format(dynamic value) {
+    try {
+      if (value is DateTime) {
+        return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+      } else if (value is String) {
+        final date = DateTime.parse(value);
+        return format(date);
+      }
+      return value.toString();
+    } catch (e) {
+      return value.toString();
+    }
+  }
 }
 
 class MultiDataViewerModel extends ChangeNotifier {
@@ -144,20 +301,10 @@ class MultiDataViewerModel extends ChangeNotifier {
   int selectedTabIndex = 0;
 
   MultiDataViewerModel({required List<DataViewerTab> tabs}) 
-      : tabs = tabs.map((tab) => DataViewerModel(
-          tabName: tab.tabName,
-          columns: tab.columns,
-          data: tab.data,
-          formatters: tab.formatters,
-        )).toList();
+      : tabs = tabs.map((tab) => DataViewerModel(tab: tab)).toList();
 
   void addTab(DataViewerTab tab) {
-    tabs.add(DataViewerModel(
-      tabName: tab.tabName,
-      columns: tab.columns,
-      data: tab.data,
-      formatters: tab.formatters,
-    ));
+    tabs.add(DataViewerModel(tab: tab));
     selectedTabIndex = tabs.length - 1;
     notifyListeners();
   }
@@ -171,25 +318,18 @@ class MultiDataViewerModel extends ChangeNotifier {
 }
 
 class DataViewerModel extends ChangeNotifier {
-  final String tabName;
-  final List<DataColumnInfo> columns;
-  final List<dynamic> data;
-  final Map<String, String Function(dynamic)> formatters;
+  final DataViewerTab tab;
   
   String? sortColumnKey;
   bool sortAscending = true;
 
-  DataViewerModel({
-    required this.tabName,
-    required this.columns,
-    required this.data,
-    required this.formatters,
-  });
+  DataViewerModel({required this.tab});
 
   List<dynamic> get sortedData {
-    if (sortColumnKey == null) return data;
+    if (sortColumnKey == null) return tab.data;
     
-    return List.from(data)..sort((a, b) {
+    return List.from(tab.data)..sort((a, b) {
+      final columnConfig = tab.columnConfigs[sortColumnKey]!;
       dynamic aValue = a[sortColumnKey];
       dynamic bValue = b[sortColumnKey];
       
@@ -197,22 +337,34 @@ class DataViewerModel extends ChangeNotifier {
       if (aValue == null) return sortAscending ? -1 : 1;
       if (bValue == null) return sortAscending ? 1 : -1;
       
+      // Use formatter for comparison if available
+      if (columnConfig.formatter != null) {
+        final aStr = columnConfig.formatter!.format(aValue);
+        final bStr = columnConfig.formatter!.format(bValue);
+        return sortAscending 
+            ? aStr.compareTo(bStr)
+            : bStr.compareTo(aStr);
+      }
+      
       // Compare based on type
       if (aValue is num && bValue is num) {
         return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
       } else if (aValue is DateTime && bValue is DateTime) {
         return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
-      } else {
-        return sortAscending 
-            ? aValue.toString().compareTo(bValue.toString())
-            : bValue.toString().compareTo(aValue.toString());
+      } else if (aValue is String && bValue is String) {
+        return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
       }
+      
+      return sortAscending 
+          ? aValue.toString().compareTo(bValue.toString())
+          : bValue.toString().compareTo(aValue.toString());
     });
   }
 
   void setSortColumn(String columnKey) {
+    if (!tab.columnConfigs[columnKey]!.sortable) return;
+    
     if (sortColumnKey == columnKey) {
-      // Toggle direction if same column
       sortAscending = !sortAscending;
     } else {
       sortColumnKey = columnKey;
@@ -221,6 +373,77 @@ class DataViewerModel extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// --------------------------
+/// Theme Definitions
+/// --------------------------
+
+@immutable
+class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
+  final TextStyle? headerStyle;
+  final Color? headerBackground;
+  final double? rowHeight;
+  final Color? evenRowColor;
+  final Color? oddRowColor;
+  final IconData? sortIcon;
+  final IconData? sortAscendingIcon;
+  final IconData? sortDescendingIcon;
+
+  const DataViewerTheme({
+    required this.headerStyle,
+    required this.headerBackground,
+    required this.rowHeight,
+    required this.evenRowColor,
+    required this.oddRowColor,
+    required this.sortIcon,
+    required this.sortAscendingIcon,
+    required this.sortDescendingIcon,
+  });
+
+  @override
+  DataViewerTheme copyWith({
+    TextStyle? headerStyle,
+    Color? headerBackground,
+    double? rowHeight,
+    Color? evenRowColor,
+    Color? oddRowColor,
+    IconData? sortIcon,
+    IconData? sortAscendingIcon,
+    IconData? sortDescendingIcon,
+  }) {
+    return DataViewerTheme(
+      headerStyle: headerStyle ?? this.headerStyle,
+      headerBackground: headerBackground ?? this.headerBackground,
+      rowHeight: rowHeight ?? this.rowHeight,
+      evenRowColor: evenRowColor ?? this.evenRowColor,
+      oddRowColor: oddRowColor ?? this.oddRowColor,
+      sortIcon: sortIcon ?? this.sortIcon,
+      sortAscendingIcon: sortAscendingIcon ?? this.sortAscendingIcon,
+      sortDescendingIcon: sortDescendingIcon ?? this.sortDescendingIcon,
+    );
+  }
+
+  @override
+  DataViewerTheme lerp(ThemeExtension<DataViewerTheme>? other, double t) {
+    if (other is! DataViewerTheme) {
+      return this;
+    }
+    return DataViewerTheme(
+      headerStyle: TextStyle.lerp(headerStyle, other.headerStyle, t),
+      headerBackground: Color.lerp(headerBackground, other.headerBackground, t),
+      rowHeight: lerpDouble(rowHeight!, other.rowHeight!, t),
+      evenRowColor: Color.lerp(evenRowColor, other.evenRowColor, t),
+      oddRowColor: Color.lerp(oddRowColor, other.oddRowColor, t),
+      sortIcon: t < 0.5 ? sortIcon : other.sortIcon,
+      sortAscendingIcon: t < 0.5 ? sortAscendingIcon : other.sortAscendingIcon,
+      sortDescendingIcon: t < 0.5 ? sortDescendingIcon : other.sortDescendingIcon,
+    );
+  }
+}
+
+/// --------------------------
+/// Widget Implementation
+/// --------------------------
 
 class MultiDataViewer extends StatefulWidget {
   const MultiDataViewer({super.key});
@@ -265,29 +488,26 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<MultiDataViewerModel>(context);
+    final theme = Theme.of(context).extension<DataViewerTheme>()!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Data Viewer'),
+        title: const Text('Smart Data Viewer'),
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          tabs: model.tabs.map((tab) => Tab(text: tab.tabName)).toList(),
+          tabs: model.tabs.map((tab) => Tab(text: tab.tab.tabName)).toList(),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              // Example of adding a new tab
-              final newTab = DataViewerTab(
+              // Example of adding a new tab with auto-configuration
+              final newTab = DataViewerTab.autoConfigure(
                 tabName: "New Tab",
-                columns: [
-                  DataColumnInfo("Field 1", "field1"),
-                  DataColumnInfo("Field 2", "field2"),
-                ],
                 data: [
-                  {"field1": "Value 1", "field2": "Value A"},
-                  {"field1": "Value 2", "field2": "Value B"},
+                  {"field1": "Value 1", "field2": 42, "date": "2023-01-01"},
+                  {"field1": "Value 2", "field2": 123, "date": "2023-02-15"},
                 ],
               );
               model.addTab(newTab);
@@ -300,7 +520,7 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
         children: model.tabs.map((tab) => 
           ChangeNotifierProvider<DataViewerModel>.value(
             value: tab,
-            child: const DataViewer(),
+            child: const DataViewerScreen(),
           ),
         ).toList(),
       ),
@@ -308,20 +528,18 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
   }
 }
 
-class DataViewer extends StatelessWidget {
-  const DataViewer({super.key});
+class DataViewerScreen extends StatelessWidget {
+  const DataViewerScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Column(
-        children: [
-          DataViewerHeader(),
-          Expanded(
-            child: DataViewerList(),
-          ),
-        ],
-      ),
+    return const Column(
+      children: [
+        DataViewerHeader(),
+        Expanded(
+          child: DataViewerList(),
+        ),
+      ],
     );
   }
 }
@@ -332,17 +550,23 @@ class DataViewerHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<DataViewerModel>(context);
+    final theme = Theme.of(context).extension<DataViewerTheme>()!;
     
-    return Row(
-      children: model.columns.map((column) {
-        return _buildHeaderItem(
-          context, 
-          column.displayName, 
-          column.dataKey,
-          column.flex,
-          column.sortable,
-        );
-      }).toList(),
+    return Container(
+      color: theme.headerBackground,
+      height: theme.rowHeight,
+      child: Row(
+        children: model.tab.columnKeys.map((key) {
+          final config = model.tab.columnConfigs[key]!;
+          return _buildHeaderItem(
+            context, 
+            config.header ?? key,
+            key,
+            config.flex,
+            config.sortable,
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -354,6 +578,8 @@ class DataViewerHeader extends StatelessWidget {
     bool sortable,
   ) {
     final model = Provider.of<DataViewerModel>(context);
+    final theme = Theme.of(context).extension<DataViewerTheme>()!;
+    
     bool isSortedColumn = model.sortColumnKey == dataKey;
     
     return Expanded(
@@ -361,17 +587,25 @@ class DataViewerHeader extends StatelessWidget {
       child: InkWell(
         onTap: sortable ? () => model.setSortColumn(dataKey) : null,
         child: Container(
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.grey),
-            ),
-          ),
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          alignment: Alignment.centerLeft,
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Text(title),
-              if (isSortedColumn)
-                Icon(model.sortAscending ? Icons.arrow_drop_up : Icons.arrow_drop_down),
+              Text(
+                title,
+                style: theme.headerStyle,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (sortable) ...[
+                const SizedBox(width: 4),
+                if (!isSortedColumn && theme.sortIcon != null)
+                  Icon(theme.sortIcon, size: 16, color: theme.headerStyle?.color),
+                if (isSortedColumn && model.sortAscending && theme.sortAscendingIcon != null)
+                  Icon(theme.sortAscendingIcon, size: 16, color: theme.headerStyle?.color),
+                if (isSortedColumn && !model.sortAscending && theme.sortDescendingIcon != null)
+                  Icon(theme.sortDescendingIcon, size: 16, color: theme.headerStyle?.color),
+              ],
             ],
           ),
         ),
@@ -386,13 +620,19 @@ class DataViewerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<DataViewerModel>(context);
+    final theme = Theme.of(context).extension<DataViewerTheme>()!;
 
     return ListView.separated(
       itemCount: model.sortedData.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
+      separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey[300]),
       itemBuilder: (context, index) {
         final item = model.sortedData[index];
-        return DataViewerListItem(item: item);
+        final rowColor = index.isEven ? theme.evenRowColor : theme.oddRowColor;
+        return Container(
+          color: rowColor,
+          height: theme.rowHeight,
+          child: DataViewerListItem(item: item),
+        );
       },
     );
   }
@@ -408,46 +648,81 @@ class DataViewerListItem extends StatelessWidget {
     final model = Provider.of<DataViewerModel>(context);
 
     return InkWell(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Item Details'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: model.columns.map((column) {
-                  final value = item[column.dataKey];
-                  final displayValue = model.formatters[column.dataKey]?.call(value) ?? value.toString();
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Text('${column.displayName}: $displayValue'),
-                  );
-                }).toList(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      },
+      onTap: () => _showItemDetails(context, item),
       child: Row(
-        children: model.columns.map((column) {
-          final value = item[column.dataKey];
-          final displayValue = model.formatters[column.dataKey]?.call(value) ?? value.toString();
+        children: model.tab.columnKeys.map((key) {
+          final config = model.tab.columnConfigs[key]!;
+          final value = item[key];
+          final formatter = config.formatter;
+          final displayValue = formatter?.format(value) ?? value.toString();
           
           return Expanded(
-            flex: column.flex,
+            flex: config.flex,
             child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(displayValue),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Align(
+                alignment: config.cellAlignment ?? Alignment.centerLeft,
+                child: Text(
+                  displayValue,
+                  style: config.cellStyle?.call(value),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  void _showItemDetails(BuildContext context, dynamic item) {
+    final model = Provider.of<DataViewerModel>(context, listen: false);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Item Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: model.tab.columnKeys.map((key) {
+              final config = model.tab.columnConfigs[key]!;
+              final value = item[key];
+              final formatter = config.formatter;
+              final displayValue = formatter?.format(value) ?? value.toString();
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: Text(
+                        config.header ?? key,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayValue,
+                        style: config.cellStyle?.call(value),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
