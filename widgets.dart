@@ -37,6 +37,8 @@ void main() async {
       tabName: "Files",
       data: jsonDecode(jsonData1),
       // Optional overrides
+      primaryColumns: ['path'],
+      secondaryColumns: ['size', 'dateModified'],
       columnOverrides: {
         "size": ColumnConfig(
           header: "Size (bytes)",
@@ -47,6 +49,8 @@ void main() async {
     DataViewerTab.autoConfigure(
       tabName: "Products",
       data: jsonDecode(jsonData2),
+      primaryColumns: ['name', 'category', 'price'],
+      secondaryColumns: ['stock'],
       // Optional overrides
       columnOverrides: {
         "price": ColumnConfig(
@@ -67,6 +71,8 @@ void main() async {
     DataViewerTab.autoConfigure(
       tabName: "Employees",
       data: jsonDecode(jsonData3),
+      primaryColumns: ['fullName', 'department', 'salary'],
+      secondaryColumns: ['hireDate', 'employeeId'],
       // Optional overrides
       columnOverrides: {
         "salary": ColumnConfig(
@@ -111,6 +117,7 @@ class MyApp extends StatelessWidget {
             sortAscendingIcon: Icons.arrow_upward,
             sortDescendingIcon: Icons.arrow_downward,
             columnDividerColor: Colors.grey,
+            rowHoverColor: Colors.blueGrey,
           ),
         ],
       ),
@@ -145,29 +152,39 @@ class DataViewerTab {
   final String tabName;
   final List<dynamic> data;
   final Map<String, ColumnConfig> columnConfigs;
+  final List<String> primaryColumns;
+  final List<String> secondaryColumns;
 
   DataViewerTab({
     required this.tabName,
     required this.data,
     required this.columnConfigs,
+    required this.primaryColumns,
+    required this.secondaryColumns,
   });
 
   factory DataViewerTab.autoConfigure({
     required String tabName,
     required List<dynamic> data,
     Map<String, ColumnConfig> columnOverrides = const {},
+    List<String>? primaryColumns,
+    List<String>? secondaryColumns,
   }) {
     if (data.isEmpty) {
       return DataViewerTab(
         tabName: tabName,
         data: data,
         columnConfigs: columnOverrides,
+        primaryColumns: primaryColumns ?? [],
+        secondaryColumns: secondaryColumns ?? [],
       );
     }
 
     // Auto-detect columns from first data item
     final firstItem = data.first as Map<String, dynamic>;
     final columnConfigs = <String, ColumnConfig>{};
+    final detectedPrimaryColumns = <String>[];
+    final detectedSecondaryColumns = <String>[];
 
     for (final key in firstItem.keys) {
       final value = firstItem[key];
@@ -181,12 +198,21 @@ class DataViewerTab {
       }
 
       columnConfigs[key] = config;
+      if (primaryColumns != null && primaryColumns.contains(key)) {
+        detectedPrimaryColumns.add(key);
+      } else if (secondaryColumns != null && secondaryColumns.contains(key)) {
+        detectedSecondaryColumns.add(key);
+      } else if (primaryColumns == null && secondaryColumns == null) {
+        detectedPrimaryColumns.add(key);
+      }
     }
 
     return DataViewerTab(
       tabName: tabName,
       data: data,
       columnConfigs: columnConfigs,
+      primaryColumns: primaryColumns ?? detectedPrimaryColumns,
+      secondaryColumns: secondaryColumns ?? detectedSecondaryColumns,
     );
   }
 
@@ -244,7 +270,7 @@ class FileSizeFormatter extends CellContentFormatter {
   @override
   String format(dynamic size) {
     if (size is! num) return size.toString();
-    
+
     if (size < 1024) {
       return '$size bytes';
     } else if (size < 1024 * 1024) {
@@ -269,7 +295,7 @@ class CurrencyFormatter extends CellContentFormatter {
   @override
   String format(dynamic value) {
     if (value is num) {
-      return showCents 
+      return showCents
           ? '$symbol${value.toStringAsFixed(2)}'
           : '$symbol${value.toStringAsFixed(0)}';
     }
@@ -301,7 +327,7 @@ class MultiDataViewerModel extends ChangeNotifier {
   List<DataViewerModel> tabs;
   int selectedTabIndex = 0;
 
-  MultiDataViewerModel({required List<DataViewerTab> tabs}) 
+  MultiDataViewerModel({required List<DataViewerTab> tabs})
       : tabs = tabs.map((tab) => DataViewerModel(tab: tab)).toList();
 
   void addTab(DataViewerTab tab) {
@@ -320,7 +346,7 @@ class MultiDataViewerModel extends ChangeNotifier {
 
 class DataViewerModel extends ChangeNotifier {
   final DataViewerTab tab;
-  
+
   String? sortColumnKey;
   bool sortAscending = true;
 
@@ -328,25 +354,25 @@ class DataViewerModel extends ChangeNotifier {
 
   List<dynamic> get sortedData {
     if (sortColumnKey == null) return tab.data;
-    
+
     return List.from(tab.data)..sort((a, b) {
       final columnConfig = tab.columnConfigs[sortColumnKey]!;
       dynamic aValue = a[sortColumnKey];
       dynamic bValue = b[sortColumnKey];
-      
+
       // Handle null values
       if (aValue == null) return sortAscending ? -1 : 1;
       if (bValue == null) return sortAscending ? 1 : -1;
-      
+
       // Use formatter for comparison if available
       if (columnConfig.formatter != null) {
         final aStr = columnConfig.formatter!.format(aValue);
         final bStr = columnConfig.formatter!.format(bValue);
-        return sortAscending 
+        return sortAscending
             ? aStr.compareTo(bStr)
             : bStr.compareTo(aStr);
       }
-      
+
       // Compare based on type
       if (aValue is num && bValue is num) {
         return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
@@ -355,8 +381,8 @@ class DataViewerModel extends ChangeNotifier {
       } else if (aValue is String && bValue is String) {
         return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
       }
-      
-      return sortAscending 
+
+      return sortAscending
           ? aValue.toString().compareTo(bValue.toString())
           : bValue.toString().compareTo(aValue.toString());
     });
@@ -364,7 +390,7 @@ class DataViewerModel extends ChangeNotifier {
 
   void setSortColumn(String columnKey) {
     if (!tab.columnConfigs[columnKey]!.sortable) return;
-    
+
     if (sortColumnKey == columnKey) {
       sortAscending = !sortAscending;
     } else {
@@ -390,6 +416,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
   final IconData? sortAscendingIcon;
   final IconData? sortDescendingIcon;
   final Color? columnDividerColor;
+  final Color? rowHoverColor;
 
   const DataViewerTheme({
     required this.headerStyle,
@@ -401,6 +428,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
     required this.sortAscendingIcon,
     required this.sortDescendingIcon,
     this.columnDividerColor,
+    this.rowHoverColor,
   });
 
   @override
@@ -414,6 +442,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
     IconData? sortAscendingIcon,
     IconData? sortDescendingIcon,
     Color? columnDividerColor,
+    Color? rowHoverColor,
   }) {
     return DataViewerTheme(
       headerStyle: headerStyle ?? this.headerStyle,
@@ -425,6 +454,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
       sortAscendingIcon: sortAscendingIcon ?? this.sortAscendingIcon,
       sortDescendingIcon: sortDescendingIcon ?? this.sortDescendingIcon,
       columnDividerColor: columnDividerColor ?? this.columnDividerColor,
+      rowHoverColor: rowHoverColor ?? this.rowHoverColor,
     );
   }
 
@@ -443,6 +473,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
       sortAscendingIcon: t < 0.5 ? sortAscendingIcon : other.sortAscendingIcon,
       sortDescendingIcon: t < 0.5 ? sortDescendingIcon : other.sortDescendingIcon,
       columnDividerColor: Color.lerp(columnDividerColor, other.columnDividerColor, t),
+      rowHoverColor: Color.lerp(rowHoverColor, other.rowHoverColor, t),
     );
   }
 }
@@ -515,6 +546,8 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
                   {"field1": "Value 1", "field2": 42, "date": "2023-01-01"},
                   {"field1": "Value 2", "field2": 123, "date": "2023-02-15"},
                 ],
+                primaryColumns: ['field1', 'field2'],
+                secondaryColumns: ['date'],
               );
               model.addTab(newTab);
             },
@@ -523,7 +556,7 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
       ),
       body: TabBarView(
         controller: _tabController,
-        children: model.tabs.map((tab) => 
+        children: model.tabs.map<Widget>((tab) =>
           ChangeNotifierProvider<DataViewerModel>.value(
             value: tab,
             child: const DataViewerScreen(),
@@ -557,7 +590,7 @@ class DataViewerHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = Provider.of<DataViewerModel>(context);
     final theme = Theme.of(context).extension<DataViewerTheme>()!;
-    
+
     return Container(
       color: theme.headerBackground,
       height: theme.rowHeight,
@@ -569,26 +602,58 @@ class DataViewerHeader extends StatelessWidget {
 
   List<Widget> _buildHeaderChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme) {
     List<Widget> children = [];
-    final columnKeys = model.tab.columnKeys;
 
-    for (int i = 0; i < columnKeys.length; i++) {
-      final key = columnKeys[i];
+    // Primary Columns
+    for (final key in model.tab.primaryColumns) {
       final config = model.tab.columnConfigs[key]!;
       children.add(
         Expanded(
-          flex: config.flex,
-          child: _buildHeaderItem(
-            context,
-            config.header ?? key,
-            key,
-            config.flex,
-            config.sortable,
+          flex: config.flex * 2, // Primary columns get double flex
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2.0),
+            child: _buildHeaderItem(
+              context,
+              config.header ?? key,
+              key,
+              config.flex * 2,
+              config.sortable,
+            ),
           ),
         ),
       );
 
-      // Add divider if not the last column
-      if (i < columnKeys.length - 1 && theme.columnDividerColor != null) {
+      // Add divider if not the last primary column
+      if (key != model.tab.primaryColumns.last && theme.columnDividerColor != null) {
+        children.add(
+          VerticalDivider(
+            color: theme.columnDividerColor,
+            width: 1.0,
+          ),
+        );
+      }
+    }
+
+    // Secondary Columns
+    for (final key in model.tab.secondaryColumns) {
+      final config = model.tab.columnConfigs[key]!;
+      children.add(
+        Expanded(
+          flex: config.flex,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2.0),
+            child: _buildHeaderItem(
+              context,
+              config.header ?? key,
+              key,
+              config.flex,
+              config.sortable,
+            ),
+          ),
+        ),
+      );
+
+      // Add divider if not the last secondary column
+      if (key != model.tab.secondaryColumns.last && theme.columnDividerColor != null) {
         children.add(
           VerticalDivider(
             color: theme.columnDividerColor,
@@ -603,17 +668,17 @@ class DataViewerHeader extends StatelessWidget {
 
 
   Widget _buildHeaderItem(
-    BuildContext context, 
-    String title, 
+    BuildContext context,
+    String title,
     String dataKey,
     int flex,
     bool sortable,
   ) {
     final model = Provider.of<DataViewerModel>(context);
     final theme = Theme.of(context).extension<DataViewerTheme>()!;
-    
+
     bool isSortedColumn = model.sortColumnKey == dataKey;
-    
+
     return InkWell(
       onTap: sortable ? () => model.setSortColumn(dataKey) : null,
       child: Container(
@@ -622,10 +687,12 @@ class DataViewerHeader extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: theme.headerStyle,
-              overflow: TextOverflow.ellipsis,
+            Expanded(
+              child: Text(
+                title,
+                style: theme.headerStyle,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             if (sortable) ...[
               const SizedBox(width: 4),
@@ -656,41 +723,87 @@ class DataViewerList extends StatelessWidget {
       separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey[300]),
       itemBuilder: (context, index) {
         final item = model.sortedData[index];
-        final rowColor = index.isEven ? theme.evenRowColor : theme.oddRowColor;
-        return Container(
-          color: rowColor,
-          height: theme.rowHeight,
-          child: DataViewerListItem(item: item),
-        );
+        return DataViewerListItem(item: item, index: index);
       },
     );
   }
 }
 
-class DataViewerListItem extends StatelessWidget {
+class DataViewerListItem extends StatefulWidget {
   final dynamic item;
-  
-  const DataViewerListItem({super.key, required this.item});
+  final int index;
+
+  const DataViewerListItem({super.key, required this.item, required this.index});
+
+  @override
+  State<DataViewerListItem> createState() => _DataViewerListItemState();
+}
+
+class _DataViewerListItemState extends State<DataViewerListItem> {
+  bool _isHovering = false;
 
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<DataViewerModel>(context);
     final theme = Theme.of(context).extension<DataViewerTheme>()!;
+    final rowColor = widget.index.isEven ? theme.evenRowColor : theme.oddRowColor;
 
-    return InkWell(
-      onTap: () => _showItemDetails(context, item),
-      child: Row(
-        children: _buildListRowChildren(context, model, theme),
+    return MouseRegion(
+      onEnter: (event) => setState(() => _isHovering = true),
+      onExit: (event) => setState(() => _isHovering = false),
+      child: InkWell(
+        onTap: () => _showItemDetails(context, widget.item),
+        child: Container(
+          color: _isHovering ? theme.rowHoverColor : rowColor,
+          height: theme.rowHeight,
+          child: Row(
+            children: _buildListRowChildren(context, model, theme, widget.item),
+          ),
+        ),
       ),
     );
   }
 
-  List<Widget> _buildListRowChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme) {
+  List<Widget> _buildListRowChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme, dynamic item) {
     List<Widget> children = [];
-    final columnKeys = model.tab.columnKeys;
 
-    for (int i = 0; i < columnKeys.length; i++) {
-      final key = columnKeys[i];
+    // Primary Columns
+    for (final key in model.tab.primaryColumns) {
+      final config = model.tab.columnConfigs[key]!;
+      final value = item[key];
+      final formatter = config.formatter;
+      final displayValue = formatter?.format(value) ?? value.toString();
+
+      children.add(
+        Expanded(
+          flex: config.flex * 2, // Primary columns get double flex
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Align(
+              alignment: config.cellAlignment ?? Alignment.centerLeft,
+              child: Text(
+                displayValue,
+                style: config.cellStyle?.call(value),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Add divider if not the last column
+      if (key != model.tab.primaryColumns.last && theme.columnDividerColor != null) {
+        children.add(
+          VerticalDivider(
+            color: theme.columnDividerColor,
+            width: 1.0,
+          ),
+        );
+      }
+    }
+
+    // Secondary Columns
+    for (final key in model.tab.secondaryColumns) {
       final config = model.tab.columnConfigs[key]!;
       final value = item[key];
       final formatter = config.formatter;
@@ -714,7 +827,7 @@ class DataViewerListItem extends StatelessWidget {
       );
 
       // Add divider if not the last column
-      if (i < columnKeys.length - 1 && theme.columnDividerColor != null) {
+      if (key != model.tab.secondaryColumns.last && theme.columnDividerColor != null) {
         children.add(
           VerticalDivider(
             color: theme.columnDividerColor,
@@ -729,7 +842,7 @@ class DataViewerListItem extends StatelessWidget {
 
   void _showItemDetails(BuildContext context, dynamic item) {
     final model = Provider.of<DataViewerModel>(context, listen: false);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -743,7 +856,7 @@ class DataViewerListItem extends StatelessWidget {
               final value = item[key];
               final formatter = config.formatter;
               final displayValue = formatter?.format(value) ?? value.toString();
-              
+
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
