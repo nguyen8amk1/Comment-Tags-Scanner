@@ -6,83 +6,121 @@ import 'dart:ui';
 
 void main() async {
   // Example 1: File Explorer Data
+  //   String jsonData1 = '''
+  //     [
+  //       {"path": "C:\\\\boot.ini", "dateModified": "2024-01-01T12:00:00Z", "size": 4096},
+  //       {"path": "C:\\\\foo.txt", "dateModified": "2024-01-05T15:30:00Z", "size": 1024},
+  //       {"path": "C:\\\\bar.txt", "dateModified": "2024-01-10T08:00:00Z", "size": 2048}
+  //     ]
+  //     ''';
+
   String jsonData1 = '''
-    [
-      {"path": "C:\\\\boot.ini", "dateModified": "2024-01-01T12:00:00Z", "size": 4096},
-      {"path": "C:\\\\foo.txt", "dateModified": "2024-01-05T15:30:00Z", "size": 1024},
-      {"path": "C:\\\\bar.txt", "dateModified": "2024-01-10T08:00:00Z", "size": 2048}
-    ]
-    ''';
+  [
+    {
+        "file": "imstb_textedit.h",
+        "line": 1140,
+        "tag": "OPTIMIZE",
+        "comment": "the undo/redo buffer should be circular"
+    },
+    {
+        "file": "imstb_textedit.h",
+        "line": 1160,
+        "tag": "OPTIMIZE",
+        "comment": "get rid of char_storage and infer it"
+    }
+]
+  ''';
 
   // Example 2: Product Inventory
+  //   String jsonData2 = '''
+  //     [
+  //       {"id": 1, "name": "Laptop", "category": "Electronics", "price": 999.99, "stock": 42},
+  //       {"id": 2, "name": "Desk Chair", "category": "Furniture", "price": 149.99, "stock": 15},
+  //       {"id": 3, "name": "Coffee Mug", "category": "Kitchen", "price": 12.99, "stock": 120}
+  //     ]
+  //     ''';
   String jsonData2 = '''
-    [
-      {"id": 1, "name": "Laptop", "category": "Electronics", "price": 999.99, "stock": 42},
-      {"id": 2, "name": "Desk Chair", "category": "Furniture", "price": 149.99, "stock": 15},
-      {"id": 3, "name": "Coffee Mug", "category": "Kitchen", "price": 12.99, "stock": 120}
-    ]
-    ''';
+  [
+    {
+        "file": "imstb_rectpack.h",
+        "line": 250,
+        "tag": "TODO",
+        "comment": "a smarter approach would be to only"
+    }
+]
+  
+  ''';
 
   // Example 3: Employee Data
   String jsonData3 = '''
-    [
-      {"employeeId": "E1001", "fullName": "John Smith", "department": "Engineering", "hireDate": "2020-05-15", "salary": 85000},
-      {"employeeId": "E1002", "fullName": "Jane Doe", "department": "Marketing", "hireDate": "2019-11-03", "salary": 72000},
-      {"employeeId": "E1003", "fullName": "Bob Johnson", "department": "HR", "hireDate": "2021-02-20", "salary": 68000}
-    ]
+[
+    {
+        "file": "imgui_tables.cpp",
+        "line": 264,
+        "tag": "FIXME",
+        "comment": "-TABLE: Currently hard-coded because of clipping assumptions with outer borders rendering."
+    },
+    {
+        "file": "imgui_tables.cpp",
+        "line": 328,
+        "tag": "FIXME",
+        "comment": "coarse clipping because access to table data causes two issues:"
+    }
+]
     ''';
 
   final initialTabs = [
     DataViewerTab.autoConfigure(
-      tabName: "Files",
+      tabName: "OPTIMIZE",
       data: jsonDecode(jsonData1),
+      primaryColumns: ['comment'],
+      secondaryColumns: ['file', 'line', 'tag'],
+      columnOverrides: {},
       // Optional overrides
-      primaryColumns: ['path'],
-      secondaryColumns: ['size', 'dateModified'],
-      columnOverrides: {
-        "size": ColumnConfig(
-          header: "Size (bytes)",
-          cellAlignment: Alignment.centerRight,
-          formatter: FileSizeFormatter()),
-      },
+      //       primaryColumns: ['path'],
+      //       secondaryColumns: ['size', 'dateModified'],
+      //       columnOverrides: {
+      //         "size": ColumnConfig(
+      //           header: "Size (bytes)",
+      //           cellAlignment: Alignment.centerRight,
+      //           formatter: FileSizeFormatter(),
+      //         ),
+      //       },
     ),
     DataViewerTab.autoConfigure(
-      tabName: "Products",
+      tabName: "TODO ",
       data: jsonDecode(jsonData2),
-      primaryColumns: ['name', 'category', 'price'],
-      secondaryColumns: ['stock'],
-      // Optional overrides
-      columnOverrides: {
-        "price": ColumnConfig(
-          header: "Price (USD)",
-          formatter: CurrencyFormatter(),
-          cellStyle: (value) => TextStyle(
-            color: value > 500 ? Colors.green : Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        "stock": ColumnConfig(
-          cellStyle: (value) => TextStyle(
-            color: value < 20 ? Colors.red : Colors.black,
-          ),
-        ),
-      },
+      primaryColumns: ['comment'],
+      secondaryColumns: ['file', 'line', 'tag'],
+      columnOverrides: {},
+      //       primaryColumns: ['name', 'category', 'price'],
+      //       secondaryColumns: ['stock'],
+      //       // Optional overrides
+      //       columnOverrides: {
+      //         "price": ColumnConfig(
+      //           header: "Price (USD)",
+      //           formatter: CurrencyFormatter(),
+      //           cellStyle:
+      //               (value) => TextStyle(
+      //                 color:
+      //                     (value is num && value > 500) ? Colors.green : Colors.black,
+      //                 fontWeight: FontWeight.bold,
+      //               ),
+      //         ),
+      //         "stock": ColumnConfig(
+      //           cellStyle:
+      //               (value) => TextStyle(
+      //                 color: (value is num && value < 20) ? Colors.red : Colors.black,
+      //               ),
+      //         ),
+      //       },
     ),
     DataViewerTab.autoConfigure(
-      tabName: "Employees",
+      tabName: "FIXME",
       data: jsonDecode(jsonData3),
-      primaryColumns: ['fullName', 'department', 'salary'],
-      secondaryColumns: ['hireDate', 'employeeId'],
-      // Optional overrides
-      columnOverrides: {
-        "salary": ColumnConfig(
-          formatter: CurrencyFormatter(showCents: false),
-          cellAlignment: Alignment.centerRight,
-        ),
-        "hireDate": ColumnConfig(
-          formatter: DateFormatter(),
-        ),
-      },
+      primaryColumns: ['comment'],
+      secondaryColumns: ['file', 'line', 'tag'],
+      columnOverrides: {},
     ),
   ];
 
@@ -230,7 +268,9 @@ class DataViewerTab {
     }
 
     // Currency detection
-    if (lowerKey.contains('price') || lowerKey.contains('salary') || lowerKey.contains('amount')) {
+    if (lowerKey.contains('price') ||
+        lowerKey.contains('salary') ||
+        lowerKey.contains('amount')) {
       return ColumnConfig(
         header: key,
         formatter: CurrencyFormatter(),
@@ -239,19 +279,15 @@ class DataViewerTab {
     }
 
     // Date detection
-    if (lowerKey.contains('date') || lowerKey.contains('modified') || lowerKey.contains('time')) {
-      return ColumnConfig(
-        header: key,
-        formatter: DateFormatter(),
-      );
+    if (lowerKey.contains('date') ||
+        lowerKey.contains('modified') ||
+        lowerKey.contains('time')) {
+      return ColumnConfig(header: key, formatter: DateFormatter());
     }
 
     // Numeric values
     if (value is num) {
-      return ColumnConfig(
-        header: key,
-        cellAlignment: Alignment.centerRight,
-      );
+      return ColumnConfig(header: key, cellAlignment: Alignment.centerRight);
     }
 
     // Default configuration
@@ -328,7 +364,7 @@ class MultiDataViewerModel extends ChangeNotifier {
   int selectedTabIndex = 0;
 
   MultiDataViewerModel({required List<DataViewerTab> tabs})
-      : tabs = tabs.map((tab) => DataViewerModel(tab: tab)).toList();
+    : tabs = tabs.map((tab) => DataViewerModel(tab: tab)).toList();
 
   void addTab(DataViewerTab tab) {
     tabs.add(DataViewerModel(tab: tab));
@@ -368,18 +404,22 @@ class DataViewerModel extends ChangeNotifier {
       if (columnConfig.formatter != null) {
         final aStr = columnConfig.formatter!.format(aValue);
         final bStr = columnConfig.formatter!.format(bValue);
-        return sortAscending
-            ? aStr.compareTo(bStr)
-            : bStr.compareTo(aStr);
+        return sortAscending ? aStr.compareTo(bStr) : bStr.compareTo(aStr);
       }
 
       // Compare based on type
       if (aValue is num && bValue is num) {
-        return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
+        return sortAscending
+            ? aValue.compareTo(bValue)
+            : bValue.compareTo(aValue);
       } else if (aValue is DateTime && bValue is DateTime) {
-        return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
+        return sortAscending
+            ? aValue.compareTo(bValue)
+            : bValue.compareTo(aValue);
       } else if (aValue is String && bValue is String) {
-        return sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
+        return sortAscending
+            ? aValue.compareTo(bValue)
+            : bValue.compareTo(aValue);
       }
 
       return sortAscending
@@ -389,7 +429,9 @@ class DataViewerModel extends ChangeNotifier {
   }
 
   void setSortColumn(String columnKey) {
-    if (!tab.columnConfigs[columnKey]!.sortable) return;
+    if (tab.columnConfigs[columnKey] == null ||
+        !tab.columnConfigs[columnKey]!.sortable)
+      return;
 
     if (sortColumnKey == columnKey) {
       sortAscending = !sortAscending;
@@ -471,8 +513,13 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
       oddRowColor: Color.lerp(oddRowColor, other.oddRowColor, t),
       sortIcon: t < 0.5 ? sortIcon : other.sortIcon,
       sortAscendingIcon: t < 0.5 ? sortAscendingIcon : other.sortAscendingIcon,
-      sortDescendingIcon: t < 0.5 ? sortDescendingIcon : other.sortDescendingIcon,
-      columnDividerColor: Color.lerp(columnDividerColor, other.columnDividerColor, t),
+      sortDescendingIcon:
+          t < 0.5 ? sortDescendingIcon : other.sortDescendingIcon,
+      columnDividerColor: Color.lerp(
+        columnDividerColor,
+        other.columnDividerColor,
+        t,
+      ),
       rowHoverColor: Color.lerp(rowHoverColor, other.rowHoverColor, t),
     );
   }
@@ -489,7 +536,8 @@ class MultiDataViewer extends StatefulWidget {
   State<MultiDataViewer> createState() => _MultiDataViewerState();
 }
 
-class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderStateMixin {
+class _MultiDataViewerState extends State<MultiDataViewer>
+    with TickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -498,7 +546,9 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
     final model = Provider.of<MultiDataViewerModel>(context, listen: false);
     _tabController = TabController(length: model.tabs.length, vsync: this);
     _tabController.addListener(() {
-      model.selectTab(_tabController.index);
+      if (_tabController.indexIsChanging) {
+        model.selectTab(_tabController.index);
+      }
     });
   }
 
@@ -510,7 +560,9 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
       _tabController.dispose();
       _tabController = TabController(length: model.tabs.length, vsync: this);
       _tabController.addListener(() {
-        model.selectTab(_tabController.index);
+        if (_tabController.indexIsChanging) {
+          model.selectTab(_tabController.index);
+        }
       });
       _tabController.index = model.selectedTabIndex;
     }
@@ -525,8 +577,6 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<MultiDataViewerModel>(context);
-    final theme = Theme.of(context).extension<DataViewerTheme>()!;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Smart Data Viewer'),
@@ -556,12 +606,15 @@ class _MultiDataViewerState extends State<MultiDataViewer> with TickerProviderSt
       ),
       body: TabBarView(
         controller: _tabController,
-        children: model.tabs.map<Widget>((tab) =>
-          ChangeNotifierProvider<DataViewerModel>.value(
-            value: tab,
-            child: const DataViewerScreen(),
-          ),
-        ).toList(),
+        children:
+            model.tabs
+                .map<Widget>(
+                  (tab) => ChangeNotifierProvider<DataViewerModel>.value(
+                    value: tab,
+                    child: const DataViewerScreen(),
+                  ),
+                )
+                .toList(),
       ),
     );
   }
@@ -573,12 +626,7 @@ class DataViewerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Column(
-      children: [
-        DataViewerHeader(),
-        Expanded(
-          child: DataViewerList(),
-        ),
-      ],
+      children: [DataViewerHeader(), Expanded(child: DataViewerList())],
     );
   }
 }
@@ -594,18 +642,20 @@ class DataViewerHeader extends StatelessWidget {
     return Container(
       color: theme.headerBackground,
       height: theme.rowHeight,
-      child: Row(
-        children: _buildHeaderChildren(context, model, theme),
-      ),
+      child: Row(children: _buildHeaderChildren(context, model, theme)),
     );
   }
 
-  List<Widget> _buildHeaderChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme) {
+  List<Widget> _buildHeaderChildren(
+    BuildContext context,
+    DataViewerModel model,
+    DataViewerTheme theme,
+  ) {
     List<Widget> children = [];
 
     // Primary Columns
     for (final key in model.tab.primaryColumns) {
-      final config = model.tab.columnConfigs[key]!;
+      final config = model.tab.columnConfigs[key] ?? ColumnConfig(header: key);
       children.add(
         Expanded(
           flex: config.flex * 2, // Primary columns get double flex
@@ -623,19 +673,17 @@ class DataViewerHeader extends StatelessWidget {
       );
 
       // Add divider if not the last primary column
-      if (key != model.tab.primaryColumns.last && theme.columnDividerColor != null) {
+      if (key != model.tab.primaryColumns.last &&
+          theme.columnDividerColor != null) {
         children.add(
-          VerticalDivider(
-            color: theme.columnDividerColor,
-            width: 1.0,
-          ),
+          VerticalDivider(color: theme.columnDividerColor, width: 1.0),
         );
       }
     }
 
     // Secondary Columns
     for (final key in model.tab.secondaryColumns) {
-      final config = model.tab.columnConfigs[key]!;
+      final config = model.tab.columnConfigs[key] ?? ColumnConfig(header: key);
       children.add(
         Expanded(
           flex: config.flex,
@@ -653,19 +701,16 @@ class DataViewerHeader extends StatelessWidget {
       );
 
       // Add divider if not the last secondary column
-      if (key != model.tab.secondaryColumns.last && theme.columnDividerColor != null) {
+      if (key != model.tab.secondaryColumns.last &&
+          theme.columnDividerColor != null) {
         children.add(
-          VerticalDivider(
-            color: theme.columnDividerColor,
-            width: 1.0,
-          ),
+          VerticalDivider(color: theme.columnDividerColor, width: 1.0),
         );
       }
     }
 
     return children;
   }
-
 
   Widget _buildHeaderItem(
     BuildContext context,
@@ -698,10 +743,22 @@ class DataViewerHeader extends StatelessWidget {
               const SizedBox(width: 4),
               if (!isSortedColumn && theme.sortIcon != null)
                 Icon(theme.sortIcon, size: 16, color: theme.headerStyle?.color),
-              if (isSortedColumn && model.sortAscending && theme.sortAscendingIcon != null)
-                Icon(theme.sortAscendingIcon, size: 16, color: theme.headerStyle?.color),
-              if (isSortedColumn && !model.sortAscending && theme.sortDescendingIcon != null)
-                Icon(theme.sortDescendingIcon, size: 16, color: theme.headerStyle?.color),
+              if (isSortedColumn &&
+                  model.sortAscending &&
+                  theme.sortAscendingIcon != null)
+                Icon(
+                  theme.sortAscendingIcon,
+                  size: 16,
+                  color: theme.headerStyle?.color,
+                ),
+              if (isSortedColumn &&
+                  !model.sortAscending &&
+                  theme.sortDescendingIcon != null)
+                Icon(
+                  theme.sortDescendingIcon,
+                  size: 16,
+                  color: theme.headerStyle?.color,
+                ),
             ],
           ],
         ),
@@ -720,7 +777,8 @@ class DataViewerList extends StatelessWidget {
 
     return ListView.separated(
       itemCount: model.sortedData.length,
-      separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey[300]),
+      separatorBuilder:
+          (context, index) => Divider(height: 1, color: Colors.grey[300]),
       itemBuilder: (context, index) {
         final item = model.sortedData[index];
         return DataViewerListItem(item: item, index: index);
@@ -733,7 +791,11 @@ class DataViewerListItem extends StatefulWidget {
   final dynamic item;
   final int index;
 
-  const DataViewerListItem({super.key, required this.item, required this.index});
+  const DataViewerListItem({
+    super.key,
+    required this.item,
+    required this.index,
+  });
 
   @override
   State<DataViewerListItem> createState() => _DataViewerListItemState();
@@ -746,7 +808,8 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
   Widget build(BuildContext context) {
     final model = Provider.of<DataViewerModel>(context);
     final theme = Theme.of(context).extension<DataViewerTheme>()!;
-    final rowColor = widget.index.isEven ? theme.evenRowColor : theme.oddRowColor;
+    final rowColor =
+        widget.index.isEven ? theme.evenRowColor : theme.oddRowColor;
 
     return MouseRegion(
       onEnter: (event) => setState(() => _isHovering = true),
@@ -764,12 +827,17 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
     );
   }
 
-  List<Widget> _buildListRowChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme, dynamic item) {
+  List<Widget> _buildListRowChildren(
+    BuildContext context,
+    DataViewerModel model,
+    DataViewerTheme theme,
+    dynamic item,
+  ) {
     List<Widget> children = [];
 
     // Primary Columns
     for (final key in model.tab.primaryColumns) {
-      final config = model.tab.columnConfigs[key]!;
+      final config = model.tab.columnConfigs[key] ?? ColumnConfig(header: key);
       final value = item[key];
       final formatter = config.formatter;
       final displayValue = formatter?.format(value) ?? value.toString();
@@ -778,7 +846,10 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
         Expanded(
           flex: config.flex * 2, // Primary columns get double flex
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Align(
               alignment: config.cellAlignment ?? Alignment.centerLeft,
               child: Text(
@@ -792,19 +863,17 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
       );
 
       // Add divider if not the last column
-      if (key != model.tab.primaryColumns.last && theme.columnDividerColor != null) {
+      if (key != model.tab.primaryColumns.last &&
+          theme.columnDividerColor != null) {
         children.add(
-          VerticalDivider(
-            color: theme.columnDividerColor,
-            width: 1.0,
-          ),
+          VerticalDivider(color: theme.columnDividerColor, width: 1.0),
         );
       }
     }
 
     // Secondary Columns
     for (final key in model.tab.secondaryColumns) {
-      final config = model.tab.columnConfigs[key]!;
+      final config = model.tab.columnConfigs[key] ?? ColumnConfig(header: key);
       final value = item[key];
       final formatter = config.formatter;
       final displayValue = formatter?.format(value) ?? value.toString();
@@ -813,7 +882,10 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
         Expanded(
           flex: config.flex,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Align(
               alignment: config.cellAlignment ?? Alignment.centerLeft,
               child: Text(
@@ -827,12 +899,10 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
       );
 
       // Add divider if not the last column
-      if (key != model.tab.secondaryColumns.last && theme.columnDividerColor != null) {
+      if (key != model.tab.secondaryColumns.last &&
+          theme.columnDividerColor != null) {
         children.add(
-          VerticalDivider(
-            color: theme.columnDividerColor,
-            width: 1.0,
-          ),
+          VerticalDivider(color: theme.columnDividerColor, width: 1.0),
         );
       }
     }
@@ -845,50 +915,58 @@ class _DataViewerListItemState extends State<DataViewerListItem> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Item Details'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: model.tab.columnKeys.map((key) {
-              final config = model.tab.columnConfigs[key]!;
-              final value = item[key];
-              final formatter = config.formatter;
-              final displayValue = formatter?.format(value) ?? value.toString();
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Item Details'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children:
+                    model.tab.columnKeys.map((key) {
+                      final config =
+                          model.tab.columnConfigs[key] ??
+                          ColumnConfig(header: key);
+                      final value = item[key];
+                      final formatter = config.formatter;
+                      final displayValue =
+                          formatter?.format(value) ?? value.toString();
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: Text(
-                        config.header ?? key,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        displayValue,
-                        style: config.cellStyle?.call(value),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 120,
+                              child: Text(
+                                config.header ?? key,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                displayValue,
+                                style: config.cellStyle?.call(value),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
     );
   }
 }
+
