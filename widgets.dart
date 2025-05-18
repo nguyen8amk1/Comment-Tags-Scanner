@@ -110,6 +110,7 @@ class MyApp extends StatelessWidget {
             sortIcon: Icons.sort,
             sortAscendingIcon: Icons.arrow_upward,
             sortDescendingIcon: Icons.arrow_downward,
+            columnDividerColor: Colors.grey,
           ),
         ],
       ),
@@ -388,6 +389,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
   final IconData? sortIcon;
   final IconData? sortAscendingIcon;
   final IconData? sortDescendingIcon;
+  final Color? columnDividerColor;
 
   const DataViewerTheme({
     required this.headerStyle,
@@ -398,6 +400,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
     required this.sortIcon,
     required this.sortAscendingIcon,
     required this.sortDescendingIcon,
+    this.columnDividerColor,
   });
 
   @override
@@ -410,6 +413,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
     IconData? sortIcon,
     IconData? sortAscendingIcon,
     IconData? sortDescendingIcon,
+    Color? columnDividerColor,
   }) {
     return DataViewerTheme(
       headerStyle: headerStyle ?? this.headerStyle,
@@ -420,6 +424,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
       sortIcon: sortIcon ?? this.sortIcon,
       sortAscendingIcon: sortAscendingIcon ?? this.sortAscendingIcon,
       sortDescendingIcon: sortDescendingIcon ?? this.sortDescendingIcon,
+      columnDividerColor: columnDividerColor ?? this.columnDividerColor,
     );
   }
 
@@ -437,6 +442,7 @@ class DataViewerTheme extends ThemeExtension<DataViewerTheme> {
       sortIcon: t < 0.5 ? sortIcon : other.sortIcon,
       sortAscendingIcon: t < 0.5 ? sortAscendingIcon : other.sortAscendingIcon,
       sortDescendingIcon: t < 0.5 ? sortDescendingIcon : other.sortDescendingIcon,
+      columnDividerColor: Color.lerp(columnDividerColor, other.columnDividerColor, t),
     );
   }
 }
@@ -556,19 +562,45 @@ class DataViewerHeader extends StatelessWidget {
       color: theme.headerBackground,
       height: theme.rowHeight,
       child: Row(
-        children: model.tab.columnKeys.map((key) {
-          final config = model.tab.columnConfigs[key]!;
-          return _buildHeaderItem(
-            context, 
+        children: _buildHeaderChildren(context, model, theme),
+      ),
+    );
+  }
+
+  List<Widget> _buildHeaderChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme) {
+    List<Widget> children = [];
+    final columnKeys = model.tab.columnKeys;
+
+    for (int i = 0; i < columnKeys.length; i++) {
+      final key = columnKeys[i];
+      final config = model.tab.columnConfigs[key]!;
+      children.add(
+        Expanded(
+          flex: config.flex,
+          child: _buildHeaderItem(
+            context,
             config.header ?? key,
             key,
             config.flex,
             config.sortable,
-          );
-        }).toList(),
-      ),
-    );
+          ),
+        ),
+      );
+
+      // Add divider if not the last column
+      if (i < columnKeys.length - 1 && theme.columnDividerColor != null) {
+        children.add(
+          VerticalDivider(
+            color: theme.columnDividerColor,
+            width: 1.0,
+          ),
+        );
+      }
+    }
+
+    return children;
   }
+
 
   Widget _buildHeaderItem(
     BuildContext context, 
@@ -582,32 +614,29 @@ class DataViewerHeader extends StatelessWidget {
     
     bool isSortedColumn = model.sortColumnKey == dataKey;
     
-    return Expanded(
-      flex: flex,
-      child: InkWell(
-        onTap: sortable ? () => model.setSortColumn(dataKey) : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          alignment: Alignment.centerLeft,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.headerStyle,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (sortable) ...[
-                const SizedBox(width: 4),
-                if (!isSortedColumn && theme.sortIcon != null)
-                  Icon(theme.sortIcon, size: 16, color: theme.headerStyle?.color),
-                if (isSortedColumn && model.sortAscending && theme.sortAscendingIcon != null)
-                  Icon(theme.sortAscendingIcon, size: 16, color: theme.headerStyle?.color),
-                if (isSortedColumn && !model.sortAscending && theme.sortDescendingIcon != null)
-                  Icon(theme.sortDescendingIcon, size: 16, color: theme.headerStyle?.color),
-              ],
+    return InkWell(
+      onTap: sortable ? () => model.setSortColumn(dataKey) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.headerStyle,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (sortable) ...[
+              const SizedBox(width: 4),
+              if (!isSortedColumn && theme.sortIcon != null)
+                Icon(theme.sortIcon, size: 16, color: theme.headerStyle?.color),
+              if (isSortedColumn && model.sortAscending && theme.sortAscendingIcon != null)
+                Icon(theme.sortAscendingIcon, size: 16, color: theme.headerStyle?.color),
+              if (isSortedColumn && !model.sortAscending && theme.sortDescendingIcon != null)
+                Icon(theme.sortDescendingIcon, size: 16, color: theme.headerStyle?.color),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -646,33 +675,56 @@ class DataViewerListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<DataViewerModel>(context);
+    final theme = Theme.of(context).extension<DataViewerTheme>()!;
 
     return InkWell(
       onTap: () => _showItemDetails(context, item),
       child: Row(
-        children: model.tab.columnKeys.map((key) {
-          final config = model.tab.columnConfigs[key]!;
-          final value = item[key];
-          final formatter = config.formatter;
-          final displayValue = formatter?.format(value) ?? value.toString();
-          
-          return Expanded(
-            flex: config.flex,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Align(
-                alignment: config.cellAlignment ?? Alignment.centerLeft,
-                child: Text(
-                  displayValue,
-                  style: config.cellStyle?.call(value),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+        children: _buildListRowChildren(context, model, theme),
       ),
     );
+  }
+
+  List<Widget> _buildListRowChildren(BuildContext context, DataViewerModel model, DataViewerTheme theme) {
+    List<Widget> children = [];
+    final columnKeys = model.tab.columnKeys;
+
+    for (int i = 0; i < columnKeys.length; i++) {
+      final key = columnKeys[i];
+      final config = model.tab.columnConfigs[key]!;
+      final value = item[key];
+      final formatter = config.formatter;
+      final displayValue = formatter?.format(value) ?? value.toString();
+
+      children.add(
+        Expanded(
+          flex: config.flex,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Align(
+              alignment: config.cellAlignment ?? Alignment.centerLeft,
+              child: Text(
+                displayValue,
+                style: config.cellStyle?.call(value),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Add divider if not the last column
+      if (i < columnKeys.length - 1 && theme.columnDividerColor != null) {
+        children.add(
+          VerticalDivider(
+            color: theme.columnDividerColor,
+            width: 1.0,
+          ),
+        );
+      }
+    }
+
+    return children;
   }
 
   void _showItemDetails(BuildContext context, dynamic item) {
